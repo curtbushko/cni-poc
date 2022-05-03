@@ -1,19 +1,19 @@
-# !/usr/bin/env bash
+#!/usr/bin/env bash
 
-KIND_VERSION=v0.11.1
+KIND_VERSION=v0.12.0
 KUBECTL_VERSION=v1.21.0
 HELM_VERSION=v3.7.2
 ISTIOCTL_VERSION=1.12.1
 
 install(){
-  sudo curl -s -Lo /usr/local/bin/$1 $2
-  sudo chmod +x /usr/local/bin/$1
+  sudo curl -s -Lo "/usr/local/bin/$1" "$2"
+  sudo chmod +x "/usr/local/bin/$1"
 }
 
 install_tgz(){
-  curl -s -Lo $1 $2
-  sudo tar xf $1 $4 -C /usr/local/bin/ $3
-  rm -rf $1
+  curl -s -Lo "$1" "$2"
+  sudo tar xf "$1" "$4" -C "/usr/local/bin/" "$3"
+  rm -rf "$1"
 }
 
 install_kind_cli() {
@@ -190,6 +190,8 @@ usage() {
     echo "                                DEFAULT: Don't install cilium cni components."
     echo "--install-multus-cni            Flag to install Multus CNI Components."
     echo "                                DEFAULT: Don't install multus cni components."
+    echo "--install-consul                Flag to install Consul Service Mesh Components."
+    echo "                                DEFAULT: Don't install consul components."
     echo "--install-istio                 Flag to install Istio Service Mesh Components."
     echo "                                DEFAULT: Don't install istio components."
     echo "--install-metallb               Flag to install Metal LB Components."
@@ -264,6 +266,8 @@ parse_args() {
                                               ;;
             --install-multus-cni )            KIND_INSTALL_MULTUS_CNI=true
                                               ;;
+            --install-consul )                KIND_INSTALL_CONSUL=true
+                                              ;;
             --install-istio )                 KIND_INSTALL_ISTIO=true
                                               ;;
             --install-metallb )               KIND_INSTALL_METALLB=true
@@ -305,6 +309,7 @@ set_default_params() {
   KIND_INSTALL_CALICO_CNI=${KIND_INSTALL_CALICO_CNI:-false}
   KIND_INSTALL_CILIUM_CNI=${KIND_INSTALL_CILIUM_CNI:-false}
   KIND_INSTALL_MULTUS_CNI=${KIND_INSTALL_MULTUS_CNI:-false}
+  KIND_INSTALL_CONSUL=${KIND_INSTALL_CONSUL:-false}
   KIND_INSTALL_ISTIO=${KIND_INSTALL_ISTIO:-false}
   KIND_INSTALL_METALLB=${KIND_INSTALL_METALLB:-false}
   KIND_INSTALL_NGINX_INGRESS=${KIND_INSTALL_NGINX_INGRESS:-false}
@@ -333,6 +338,7 @@ print_params() {
      echo "KIND_INSTALL_CALICO_CNI = $KIND_INSTALL_CALICO_CNI"
      echo "KIND_INSTALL_CILIUM_CNI = $KIND_INSTALL_CILIUM_CNI"
      echo "KIND_INSTALL_MULTUS_CNI = $KIND_INSTALL_MULTUS_CNI"
+     echo "KIND_INSTALL_CONSUL = $KIND_INSTALL_CONSUL"
      echo "KIND_INSTALL_ISTIO = $KIND_INSTALL_ISTIO"
      echo "KIND_INSTALL_METALLB = $KIND_INSTALL_METALLB"
      echo "KIND_INSTALL_NGINX_INGRESS = $KIND_INSTALL_NGINX_INGRESS"
@@ -429,6 +435,20 @@ nodes:
      listenAddress: "0.0.0.0"
      protocol: TCP
 {%- endif %}
+{%- if install_consul is equalto "true" %}
+   - containerPort: 30000
+     hostPort: 80
+     listenAddress: "0.0.0.0"
+     protocol: TCP
+   - containerPort: 30001
+     hostPort: 443
+     listenAddress: "0.0.0.0"
+     protocol: TCP
+   - containerPort: 30002
+     hostPort: 15021
+     listenAddress: "0.0.0.0"
+     protocol: TCP
+{%- endif %}
 {%- if install_istio is equalto "true" %}
    - containerPort: 30000
      hostPort: 80
@@ -471,6 +491,7 @@ create_kind_cluster() {
     cluster_apiaddress=${KIND_CLUSTER_APIADDRESS} \
     cluster_apiport=${KIND_CLUSTER_APIPORT} \
     disable_default_cni=$KIND_DISABLE_DEFAULT_CNI \
+    install_consul=$KIND_INSTALL_CONSUL \
     install_istio=$KIND_INSTALL_ISTIO \
     install_nginx=$KIND_INSTALL_NGINX_INGRESS \
     install_contour=$KIND_INSTALL_CONTOUR_INGRESS \
@@ -528,7 +549,7 @@ install_cilium_cni() {
 
 install_multus_cni () {
   # https://github.com/k8snetworkplumbingwg/multus-cni
-  run_kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/images/multus-daemonset.yml
+  run_kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml
   sleep 15
   if ! kubectl wait -n kube-system --for=condition=ready pods -l app=multus --timeout=300s ; then
     echo "some pods in the system are not running"
@@ -933,6 +954,11 @@ spec:
 EOF
 }
 
+install_consul() {
+  helm repo add hashicorp https://helm.releases.hashicorp.com
+  helm install consul hashicorp/consul --set global.name=consul --create-namespace -n consul -f ./consul-values.yaml
+}
+
 install_istio() {
   # https://istio.io
   # Extract default install profile run ./istioctl profile dump > istio/profile.yaml
@@ -1070,6 +1096,9 @@ if [ "$KIND_INSTALL_CILIUM_CNI" == true ]; then
 fi
 if [ "$KIND_INSTALL_MULTUS_CNI" == true ]; then
   install_multus_cni
+fi
+if [ "$KIND_INSTALL_CONSUL" == true ]; then
+  install_consul
 fi
 if [ "$KIND_INSTALL_ISTIO" == true ]; then
   generate_istio_profile
