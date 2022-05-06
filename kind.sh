@@ -154,6 +154,7 @@ usage() {
     echo "               [--install-calico-cni]"
     echo "               [--install-cilium-cni]"
     echo "               [--install-multus-cni]"
+    echo "               [--install-consul]"
     echo "               [--install-istio]"
     echo "               [--install-metallb]"
     echo "               [--install-nginx-ingress]"
