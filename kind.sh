@@ -3,7 +3,7 @@
 KIND_VERSION=v0.12.0
 KUBECTL_VERSION=v1.21.0
 HELM_VERSION=v3.7.2
-ISTIOCTL_VERSION=1.12.1
+ISTIOCTL_VERSION=1.13.3
 
 install(){
   sudo curl -s -Lo "/usr/local/bin/$1" "$2"
@@ -665,7 +665,7 @@ spec:
     base:
       enabled: true
     cni:
-      enabled: false
+      enabled: true
     egressGateways:
     - enabled: true
       k8s:
@@ -813,6 +813,9 @@ spec:
   profile: default
   tag: 1.10.0
   values:
+    sidecarInjectorWebhook:
+      injectedAnnotations:
+        k8s.v1.cni.cncf.io/networks: istio-cni
     base:
       enableCRDTemplates: false
       validationURL: ""
