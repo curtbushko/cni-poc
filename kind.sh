@@ -4,6 +4,7 @@ KIND_VERSION=v0.12.0
 KUBECTL_VERSION=v1.21.0
 HELM_VERSION=v3.7.2
 ISTIOCTL_VERSION=1.13.3
+CONSUL_VERSION=0.43.0
 
 install(){
   sudo curl -s -Lo "/usr/local/bin/$1" "$2"
@@ -960,7 +961,7 @@ EOF
 
 install_consul() {
   helm repo add hashicorp https://helm.releases.hashicorp.com
-  helm install consul hashicorp/consul --set global.name=consul --create-namespace -n consul -f ./consul-values.yaml
+  helm install -f config.yaml consul hashicorp/consul --create-namespace -n consul --version "$CONSUL_VERSION"
 }
 
 install_istio() {
