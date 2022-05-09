@@ -1,0 +1,23 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: hello-app
+  labels:
+    app: hello-app
+spec:
+  containers:
+  - name: hello-app
+    image: hashicorp/http-echo:0.2.3
+    args:
+    - "-text=Hello World! This is a hello Kubernetes with kind App"
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: hello-service
+spec:
+  selector:
+    app: hello-app
+  ports:
+  # Default port used by the image
+  - port: 5678

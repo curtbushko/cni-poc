@@ -969,6 +969,7 @@ install_istio() {
   # Extract default install profile run ./istioctl profile dump > istio/profile.yaml
   istioctl install -y -f ./kind-istio.yaml
   rm ./kind-istio.yaml
+  kubectl label namespace default istio-injection=enabled --overwrite
 }
 
 install_metallb() {
