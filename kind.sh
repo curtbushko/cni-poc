@@ -967,8 +967,8 @@ install_consul() {
 install_istio() {
   # https://istio.io
   # Extract default install profile run ./istioctl profile dump > istio/profile.yaml
-  istioctl install -y -f ./kind-istio.yaml
-  rm ./kind-istio.yaml
+  #istioctl install -y -f ./kind-istio.yaml
+  istioctl install -y -f ./istio-values.yaml
   kubectl label namespace default istio-injection=enabled --overwrite
 }
 
@@ -1107,7 +1107,7 @@ if [ "$KIND_INSTALL_CONSUL" == true ]; then
   install_consul
 fi
 if [ "$KIND_INSTALL_ISTIO" == true ]; then
-  generate_istio_profile
+  #generate_istio_profile
   install_istio
 fi
 if [ "$KIND_INSTALL_METALLB" == true ]; then

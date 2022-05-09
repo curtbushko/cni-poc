@@ -4,8 +4,6 @@ metadata:
   namespace: istio-system
   name: istiocontrolplane
 spec:
-  hub: docker.io/querycapistio
-  profile: minimal
   components:
     base:
       enabled: true
@@ -66,19 +64,9 @@ spec:
     accessLogEncoding: "JSON"
   values:
     global:
-      imagePullPolicy: IfNotPresent
-      proxy_init:
-        image: istio-proxyv2
-    pilot:
-      image: istio-pilot
     cni:
-      image: istio-install-cni
-      cniBinDir: /opt/cni/bin
-      cniConfDir: /etc/cni/net.d
-      repair:
-        enabled: true
-      logLevel: info
       excludeNamespaces:
         - istio-system
         - kube-system
-        - istio-operator
+    sidecarInjectorWebhook:
+      rewriteAppHTTPProbe: true
