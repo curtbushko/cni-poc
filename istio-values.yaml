@@ -6,6 +6,7 @@ spec:
       enabled: true
     cni:
       enabled: true
+      chained: true
     egressGateways:
     - enabled: false
       k8s:
