@@ -1,1 +1,0 @@
-/Users/curtbushko/workspace/github.com/hashicorp/feature-cni/control-plane/go.mod
