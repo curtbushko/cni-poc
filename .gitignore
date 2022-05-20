@@ -14,3 +14,16 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 /cni/dist
+PROJECT
+api
+build-support
+catalog
+commands.go
+config
+consul
+controller
+hack
+helper
+main.go
+namespaces
+version
