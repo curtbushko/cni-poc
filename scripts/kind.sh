@@ -961,7 +961,7 @@ EOF
 
 install_consul() {
   helm repo add hashicorp https://helm.releases.hashicorp.com
-  helm install -f config.yaml consul hashicorp/consul --create-namespace -n consul --version "$CONSUL_VERSION"
+  helm install -f consul-values.yaml consul hashicorp/consul --create-namespace -n consul --version "$CONSUL_VERSION"
 }
 
 install_istio() {
