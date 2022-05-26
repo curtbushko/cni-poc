@@ -12,5 +12,4 @@ rsync "${SRC}/control-plane/Makefile" "${DEST}"
 rsync "${SRC}/control-plane/go.mod" "${DEST}"
 rsync "${SRC}/control-plane/go.sum" "${DEST}"
 rsync -a "${SRC}/control-plane/subcommand/cni-install" "${DEST}/subcommand/cni-install"
-rsync -a "${SRC}/control-plane/subcommand/cni-validate" "${DEST}/subcommand/cni-validate"
 
