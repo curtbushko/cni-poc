@@ -16,9 +16,9 @@
 /cni/dist
 /cni/bin
 /cni/pkg
+/cni/cni
 PROJECT
 api
-build-support
 catalog
 commands.go
 config

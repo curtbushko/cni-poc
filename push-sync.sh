@@ -13,4 +13,5 @@ rsync "${SRC}/Makefile" "${DEST}"
 rsync "${SRC}/go.mod" "${DEST}"
 rsync "${SRC}/go.sum" "${DEST}"
 rsync -a "${SRC}/subcommand/cni-install" "${DEST}/subcommand/cni-install"
+rsync -a "${SRC}/build-support/scripts/build-local.sh" "${DEST}/build-support/scripts/"
 
