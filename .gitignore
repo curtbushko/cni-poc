@@ -20,12 +20,10 @@
 PROJECT
 api
 catalog
-commands.go
 config
 consul
 controller
 hack
 helper
-main.go
 namespaces
 version

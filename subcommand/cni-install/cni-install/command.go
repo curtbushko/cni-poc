@@ -57,6 +57,12 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
+func (c *Command) Synopsis() string { return synopsis }
+func (c *Command) Help() string {
+	c.once.Do(c.init)
+	return c.help
+}
+
 const synopsis = "CNI install command."
 const help = `
 Usage: consul-k8s-control-plane cni-install [options]
