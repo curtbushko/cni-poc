@@ -2,6 +2,7 @@
 SRC=${HOME}/workspace/github.com/hashicorp/feature-cni
 DEST=${HOME}/workspace/github.com/curtbushko/cni-poc
 
+mkdir -p "${DEST}/cni"
 mkdir -p "${DEST}/subcommand"
 mkdir -p "${DEST}/build-support/scripts"
 #mkdir -p "${DEST}/connect-inject"
