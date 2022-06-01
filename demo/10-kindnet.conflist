@@ -31,11 +31,11 @@
     },
     {
       "name": "consul-cni",
-      "type": "consul-cni"
+      "type": "consul-cni",
       "cni_bin_dir": "/opt/cni/bin",
-      "cni_net_dir": "/etc/cni/net.d"
-      "kubeconfig": "/etc/cni/net.d/ZZZ-consul-cni-kubeconfig"
-      "log_level": "info",
+      "cni_net_dir": "/etc/cni/net.d",
+      "kubeconfig": "/etc/cni/net.d/ZZZ-consul-cni-kubeconfig",
+      "log_level": "info"
     }
   ]
 }
