@@ -36,12 +36,16 @@ type PluginConf struct {
 	// to more easily parse standard fields like Name, Type, CNIVersion,
 	// and PrevResult.
 	types.NetConf
+	RuntimeConfig *struct { // SampleConfig map[string]interface{} `json:"sample"`
+	} `json:"runtimeConfig"`
 
 	// This is the previous result, when called in the context of a chained
 	// plugin. We will just pass any prevResult through.
 	RawPrevResult *map[string]interface{} `json:"prevResult"`
 	PrevResult    *cniv1.Result           `json:"-"`
 
+	CNIBinDir  string `json:"cni_bin_dir"`
+	CNINetDir  string `json:"cni_net_dir"`
 	LogLevel   string `json:"log_level"`
 	KubeConfig string `json:"kubeconfig"`
 }
@@ -90,22 +94,17 @@ func cmdAdd(args *skel.CmdArgs) error {
 	// earlier plugins in the chain.
 
 	// START chained plugin code
-	if conf.PrevResult == nil {
-		return fmt.Errorf("consul-cni: must be called as chained plugin")
-	}
+	// if conf.PrevResult == nil {
+	// 	return fmt.Errorf("consul-cni: must be called as chained plugin")
+	// }
 
 	// Convert the PrevResult to a concrete Result type that can be modified.
-	prevResult, err := cniv1.GetResult(conf.PrevResult)
-	if err != nil {
-		return fmt.Errorf("consul-cni: failed to convert prevResult: %v", err)
-	}
 
-	if len(prevResult.IPs) == 0 {
-		return fmt.Errorf("consul-cni: got no container IPs")
-	}
+	// if len(prevResult.IPs) == 0 {
+	// 	return fmt.Errorf("consul-cni: got no container IPs")
+	// }
 
 	// Pass the prevResult through this plugin to the next one
-	result := prevResult
 
 	// END chained plugin code
 
@@ -136,9 +135,17 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	// Implement your plugin here
 	fmt.Printf("consul-cni: fake code")
-
-	// Pass through the result for the next plugin
+	var result *cniv1.Result
+	if conf.PrevResult == nil {
+		result = &cniv1.Result{
+			CNIVersion: cniv1.ImplementedSpecVersion,
+		}
+	} else {
+		// Pass through the result for the next plugin
+		result = conf.PrevResult
+	}
 	return types.PrintResult(result, conf.CNIVersion)
+
 }
 
 // cmdDel is called for DELETE requests
