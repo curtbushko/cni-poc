@@ -4,9 +4,11 @@ package cniinstall
 // TODO: In the helm chart, follow linkerd, they read the configmap and assign the contents to env variables thus avoiding chicken and egg. Everything needed is in the configmap. Why does istio mix like this?
 
 import (
+	"errors"
 	"flag"
 	"sync"
 
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -31,6 +33,7 @@ type Command struct {
 	flagCNINetDir string // Location of cni configuration file (used by cni-install command and cni plugin)
 	flagChained   bool   // If the plugin is a chained or multus plugin. Affects how the config is written
 	flagLogLevel  string // Log level for installer and plugin. Default info. (trace|debug|info|warn|error)
+	flagLogJSON   bool
 
 	flagSet *flag.FlagSet
 
@@ -49,12 +52,57 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+
+	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
+		"Enable or disable JSON output format for logging.")
+
 	c.help = flags.Usage(help, c.flagSet)
 }
 
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
+
+	// Validate command.
+	if err := c.flagSet.Parse(args); err != nil {
+		return 1
+	}
+
+	// Validate flags
+	if err := c.validateFlags(); err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
+	// Set up logging.
+	if c.logger == nil {
+		var err error
+		c.logger, err = common.Logger(c.flagLogLevel, c.flagLogJSON)
+		if err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
+	}
+
+	if err := c.readConfigFile(); err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
 	return 0
+}
+
+func (c *Command) readConfigFile() error {
+
+	return nil
+}
+
+func (c *Command) validateFlags() error {
+	if c.flagCNIBinDir == "" {
+		return errors.New("-cni-bin-dir-must be set")
+	}
+	if c.flagCNINetDir == "" {
+		return errors.New("-cni-net-dir must be set")
+	}
+	return nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }

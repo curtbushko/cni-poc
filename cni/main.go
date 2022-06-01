@@ -43,7 +43,7 @@ type PluginConf struct {
 	PrevResult    *cniv1.Result           `json:"-"`
 
 	LogLevel   string `json:"log_level"`
-	KubeConfig string `json:"kube_config"`
+	KubeConfig string `json:"kubeconfig"`
 }
 
 // parseConfig parses the supplied configuration (and prevResult) from stdin.
@@ -69,7 +69,7 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 	}
 
 	if conf.KubeConfig == "" {
-		return nil, fmt.Errorf("consul-cni: kube_config must be specified")
+		return nil, fmt.Errorf("consul-cni: kubeconfig must be specified")
 	}
 
 	return &conf, nil
@@ -135,6 +135,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	// END originating plugin code
 
 	// Implement your plugin here
+	fmt.Printf("consul-cni: fake code")
 
 	// Pass through the result for the next plugin
 	return types.PrintResult(result, conf.CNIVersion)
@@ -155,7 +156,7 @@ func cmdDel(args *skel.CmdArgs) error {
 
 func main() {
 	// replace TODO with your plugin name
-	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("TODO"))
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("consul-cni"))
 }
 
 func cmdCheck(args *skel.CmdArgs) error {
