@@ -1,6 +1,6 @@
 #!/bin/bash
 SRC=${HOME}/workspace/github.com/hashicorp/feature-cni
-DEST=${HOME}/workspace/github.com/curtbushko/cni-poc
+DEST=${HOME}/workspace/github.com/curtbushko/cni-poc/consul-k8s
 
 mkdir -p "${DEST}/cni"
 mkdir -p "${DEST}/subcommand"
