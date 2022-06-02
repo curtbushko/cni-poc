@@ -17,6 +17,7 @@
 /cni/bin
 /cni/pkg
 /cni/cni
+/demo/consul-cni
 PROJECT
 api
 catalog
