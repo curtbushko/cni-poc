@@ -33,15 +33,15 @@
       "kubernetes": {
         "cni_bin_dir": "/opt/cni/bin",
         "exclude_namespaces": [
-          "istio-system",
+          "consul-system",
           "kube-system"
         ],
-        "kubeconfig": "/etc/cni/net.d/ZZZ-istio-cni-kubeconfig"
+        "kubeconfig": "/etc/cni/net.d/ZZZ-consul-cni-kubeconfig"
       },
       "log_level": "info",
-      "log_uds_address": "/var/run/istio-cni/log.sock",
-      "name": "istio-cni",
-      "type": "istio-cni"
+      "log_uds_address": "/var/run/consul-cni/log.sock",
+      "name": "consul-cni",
+      "type": "consul-cni"
     }
   ]
 }
