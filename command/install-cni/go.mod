@@ -3,9 +3,11 @@ module installcni
 go 1.18
 
 require (
+	github.com/containernetworking/cni v1.1.1
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20220603175436-7142fa9c455a
 	github.com/hashicorp/go-hclog v1.2.0
 	github.com/mitchellh/cli v1.1.4
+	k8s.io/klog v1.0.0
 )
 
 require (
