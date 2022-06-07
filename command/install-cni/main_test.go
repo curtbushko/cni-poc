@@ -1,9 +1,12 @@
 package installcni
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TODO: Test scenario where a goes from .conf to .conflist
@@ -32,7 +35,7 @@ func TestCreateCNIConfigFile(t *testing.T) {
 		Name:       defaultName,
 		Type:       defaultType,
 		CNIBinDir:  defaultCNIBinDir,
-		CNINetDir:  defaultCNINetDir,
+		CNINetDir:  "testdata",
 		Multus:     defaultMultus,
 		Kubeconfig: defaultKubeconfig,
 		LogLevel:   defaultLogLevel,
@@ -41,16 +44,20 @@ func TestCreateCNIConfigFile(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 
 			tempDir := t.TempDir()
-			cfg.CNINetDir = tempDir
-			// Copy test data to temporary directory to simulate the original config file on a host
-			if err := copy(filepath.Join("testdata", c.srcFile), tempDir, c.srcFile); err != nil {
-				t.Fatal(err)
-			}
+			tempDestFile := filepath.Join(tempDir, c.destFile)
 
-			err := appendCNIConfig(cfg, c.srcFile, c.destFile, nil)
+			err := appendCNIConfig(cfg, c.srcFile, tempDestFile, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			actual, err := ioutil.ReadFile(tempDestFile)
+
+			golden := filepath.Join("testdata", c.goldenFile)
+			expected, err := ioutil.ReadFile(golden)
+			require.NoError(t, err)
+
+			require.Equal(t, string(expected), string(actual))
 		})
 	}
 }

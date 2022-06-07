@@ -169,18 +169,41 @@ func appendCNIConfig(cfg *CNIConfig, srcFile, destFile string, logger hclog.Logg
 		return err
 	}
 
+	// convert the consul-cni struct into a map
 	var cfgMap map[string]interface{}
-
 	err = mapstructure.Decode(cfg, &cfgMap)
 	if err != nil {
 		return fmt.Errorf("error loading Consul CNI config: %v", err)
 	}
 
+	// Convert the json config file into a map. The map that is created has 2 parts:
+	// [0] the cni header ()
 	var existingMap map[string]interface{}
 	err = json.Unmarshal(existingCNIConfig, &existingMap)
 	if err != nil {
-		return fmt.Errorf("error loading existing CNI config (JSON error): %v", err)
+		return fmt.Errorf("error unmarshalling existing CNI config: %v", err)
 	}
+
+	// Get the 'plugins' map embedded inside of the exisingMap
+	plugins, ok := existingMap["plugins"].([]interface{})
+	if !ok {
+		return fmt.Errorf("error reading plugin list from CNI config")
+	}
+
+	// Append the consul-cni map to the already existing plugins
+	existingMap["plugins"] = append(plugins, cfgMap)
+
+	// Marshal into a new json file
+	existingJson, err := json.MarshalIndent(existingMap, "", "  ")
+	existingJson = append(existingJson, "\n"...)
+
+	// Write the file out
+
+	err = os.WriteFile(destFile, existingJson, os.FileMode(0o644))
+	if err != nil {
+		return fmt.Errorf("error writing config file %s: %v", destFile, err)
+	}
+
 	return nil
 }
 

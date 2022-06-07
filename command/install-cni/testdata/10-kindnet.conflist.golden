@@ -9,7 +9,7 @@
         "ranges": [
           [
             {
-              "subnet": "10.128.0.0/24"
+              "subnet": "10.244.0.0/24"
             }
           ]
         ],
@@ -30,18 +30,13 @@
       "type": "portmap"
     },
     {
-      "kubernetes": {
-        "cni_bin_dir": "/opt/cni/bin",
-        "exclude_namespaces": [
-          "istio-system",
-          "kube-system"
-        ],
-        "kubeconfig": "/etc/cni/net.d/ZZZ-istio-cni-kubeconfig"
-      },
+      "cni_bin_dir": "/opt/cni/bin",
+      "cni_net_dir": "testdata",
+      "kubeconfig": "ZZZZ-consul-cni-kubeconfig",
       "log_level": "info",
-      "log_uds_address": "/var/run/istio-cni/log.sock",
-      "name": "istio-cni",
-      "type": "istio-cni"
+      "multus": false,
+      "name": "consul-cni",
+      "type": "consul-cni"
     }
   ]
 }

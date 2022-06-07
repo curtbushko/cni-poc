@@ -7,7 +7,8 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20220603175436-7142fa9c455a
 	github.com/hashicorp/go-hclog v1.2.0
 	github.com/mitchellh/cli v1.1.4
-	k8s.io/klog v1.0.0
+	github.com/mitchellh/mapstructure v1.4.1
+	github.com/stretchr/testify v1.7.0
 )
 
 require (
@@ -73,7 +74,6 @@ require (
 	github.com/miekg/dns v1.1.41 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
@@ -88,7 +88,6 @@ require (
 	github.com/softlayer/softlayer-go v0.0.0-20180806151055-260589d94c7d // indirect
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/tencentcloud/tencentcloud-sdk-go v3.0.83+incompatible // indirect
 	github.com/vmware/govmomi v0.18.0 // indirect
 	go.opencensus.io v0.22.3 // indirect
