@@ -57,6 +57,7 @@ type installConfig struct {
 	// TODO: We will need kubernetes specific config and a way to generate a kubeconfig file
 }
 
+// Command flags and structure
 type Command struct {
 	UI cli.Ui
 
@@ -67,7 +68,6 @@ type Command struct {
 	flagCNIBinSourceDir string
 	flagLogLevel        string
 	flagLogJSON         bool
-	blah                bool
 
 	flagSet *flag.FlagSet
 
@@ -91,6 +91,7 @@ func (c *Command) init() {
 	c.help = flags.Usage(help, c.flagSet)
 }
 
+// Run runs the command
 func (c *Command) Run(args []string) int {
 	var err error
 	c.once.Do(c.init)
@@ -110,32 +111,42 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
-	cfg, err := c.NewCNIConfig()
+
+	// Create the CNI Config from command flags
+	cfg, err := c.newCNIConfig()
 	if err != nil {
 		return 1
 	}
 
+	// Get the config file that is on the host
 	srcFile, err := getDefaultCNINetwork(cfg.CNINetDir, c.logger)
 	if err != nil {
 		return 1
 	}
 
+	// Get the dest file we will write to (the name can change)
 	destFile, err := getDestFile(srcFile, c.logger)
+	if err != nil {
+		return 1
+	}
 
+	// Append the consul configuration to the config that is there
 	err = appendCNIConfig(cfg, srcFile, destFile, c.logger)
 	if err != nil {
 		return 1
 	}
 
-	// TODO: get config file
-	// TODO: read config file into byte[]
-	// TODO: convert config struct into map using mitchellh/mapstructure. see server-acl-init command.go
+	// Generate the kubeconfig file
+	err = createKubeConfig(cfg, c.logger)
+	if err != nil {
+		return 1
+	}
 
 	return 0
 
 }
 
-func (c *Command) NewCNIConfig() (*CNIConfig, error) {
+func (c *Command) newCNIConfig() (*CNIConfig, error) {
 	return &CNIConfig{
 		Name:       defaultName,
 		Type:       defaultType,
@@ -147,7 +158,7 @@ func (c *Command) NewCNIConfig() (*CNIConfig, error) {
 	}, nil
 }
 
-func (c *Command) NewInstallConfig() (*installConfig, error) {
+func (c *Command) newInstallConfig() (*installConfig, error) {
 	return &installConfig{
 		CNIBinSourceDir: c.flagCNIBinSourceDir,
 	}, nil
@@ -158,9 +169,8 @@ func appendCNIConfig(cfg *CNIConfig, srcFile, destFile string, logger hclog.Logg
 	// Needed to convert the config struct for inserting
 	// Check if file exists
 	srcFilePath := filepath.Join(cfg.CNINetDir, srcFile)
-	_, err := os.Stat(srcFilePath)
 	if _, err := os.Stat(srcFilePath); os.IsNotExist(err) {
-		return fmt.Errorf("Source cni config file %s does not exist", srcFilePath)
+		return fmt.Errorf("source cni config file %s does not exist: %v", srcFilePath, err)
 	}
 
 	// This section overwrites an existing plugins list entry for istio-cni
@@ -194,12 +204,15 @@ func appendCNIConfig(cfg *CNIConfig, srcFile, destFile string, logger hclog.Logg
 	existingMap["plugins"] = append(plugins, cfgMap)
 
 	// Marshal into a new json file
-	existingJson, err := json.MarshalIndent(existingMap, "", "  ")
-	existingJson = append(existingJson, "\n"...)
+	existingJSON, err := json.MarshalIndent(existingMap, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error marshalling existing CNI config: %v", err)
+	}
+	existingJSON = append(existingJSON, "\n"...)
 
 	// Write the file out
 
-	err = os.WriteFile(destFile, existingJson, os.FileMode(0o644))
+	err = os.WriteFile(destFile, existingJSON, os.FileMode(0o644))
 	if err != nil {
 		return fmt.Errorf("error writing config file %s: %v", destFile, err)
 	}
@@ -215,7 +228,7 @@ func getDefaultCNINetwork(confDir string, logger hclog.Logger) (string, error) {
 	case err != nil:
 		return "", err
 	case len(files) == 0:
-		return "", fmt.Errorf("No networks found in %s", confDir)
+		return "", fmt.Errorf("no networks found in %s", confDir)
 	}
 
 	sort.Strings(files)
@@ -254,14 +267,17 @@ func getDefaultCNINetwork(confDir string, logger hclog.Logger) (string, error) {
 		logger.Info("Using CNI configuration file %s", confFile)
 		return filepath.Base(confFile), nil
 	}
-	return "", fmt.Errorf("No valid networks found in %s", confDir)
+	return "", fmt.Errorf("no valid networks found in %s", confDir)
 }
 
 func getDestFile(srcFile string, logger hclog.Logger) (string, error) {
 	return srcFile, nil
 }
 
+// Synopsis returns the summary of the cni install command
 func (c *Command) Synopsis() string { return synopsis }
+
+// Help returns the help output of the command
 func (c *Command) Help() string {
 	c.once.Do(c.init)
 	return c.help

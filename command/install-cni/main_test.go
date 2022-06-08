@@ -2,7 +2,6 @@ package installcni
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -52,6 +51,7 @@ func TestCreateCNIConfigFile(t *testing.T) {
 			}
 
 			actual, err := ioutil.ReadFile(tempDestFile)
+			require.NoError(t, err)
 
 			golden := filepath.Join("testdata", c.goldenFile)
 			expected, err := ioutil.ReadFile(golden)
@@ -60,18 +60,4 @@ func TestCreateCNIConfigFile(t *testing.T) {
 			require.Equal(t, string(expected), string(actual))
 		})
 	}
-}
-
-func copy(srcFilepath, targetDir, targetFilename string) error {
-	info, err := os.Stat(srcFilepath)
-	if err != nil {
-		return err
-	}
-
-	input, err := os.ReadFile(srcFilepath)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(filepath.Join(targetDir, targetFilename), input, info.Mode())
 }
