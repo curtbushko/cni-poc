@@ -25,6 +25,13 @@ func TestCreateCNIConfigFile(t *testing.T) {
 			destFile:     "10-kindnet.conflist",
 			goldenFile:   "testdata/10-kindnet.conflist.golden",
 		},
+		{
+			name:         "invalid kindnet file that already has consul-cni config inserted, should remove entry and append",
+			consulConfig: &CNIConfig{},
+			srcFile:      "testdata/10-kindnet.conflist.alreadyinserted",
+			destFile:     "10-kindnet.conflist",
+			goldenFile:   "testdata/10-kindnet.conflist.golden",
+		},
 	}
 
 	// set context so that the command will timeout

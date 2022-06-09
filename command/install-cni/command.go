@@ -144,12 +144,8 @@ func (c *Command) Run(args []string) int {
 	// Get the correct mounted file paths from inside the container
 	srcFile := filepath.Join(install.MountedCNINetDir, srcFileName)
 	destFile := filepath.Join(install.MountedCNINetDir, destFileName)
-	// Append the consul configuration to the config that is there
 
-	// TODO: Handle pod restarts and continuous appending of config
-	// TODO: consul-cni binary needs chmod +x
-	// TODO: Handle binary already exists, replace?
-	// TODO: Add debug/info logging to functions
+	// Append the consul configuration to the config that is there
 	err = appendCNIConfig(cfg, srcFile, destFile, c.logger)
 	if err != nil {
 		c.logger.Error("Unable add the consul-cni config to the config file", "error", err)
@@ -227,6 +223,19 @@ func appendCNIConfig(cfg *CNIConfig, srcFile, destFile string, logger hclog.Logg
 		return fmt.Errorf("error reading plugin list from CNI config")
 	}
 
+	// Check to see if 'type: consul-cni' already exists and remove it before appending.
+	// This can happen in a CrashLoop and we end up with many entries in the config file
+	for i, p := range plugins {
+		plugin, ok := p.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("error reading plugin from plugin list")
+		}
+		if plugin["type"] == "consul-cni" {
+			plugins = append(plugins[:i], plugins[i+1:]...)
+			break
+		}
+	}
+
 	// Append the consul-cni map to the already existing plugins
 	existingMap["plugins"] = append(plugins, cfgMap)
 
@@ -263,43 +272,44 @@ func getDefaultCNINetwork(confDir string, logger hclog.Logger) (string, error) {
 		if strings.HasSuffix(confFile, ".conflist") {
 			confList, err = libcni.ConfListFromFile(confFile)
 			if err != nil {
-				logger.Warn("Error loading CNI config list file %s: %v", confFile, err)
+				logger.Warn("Error loading CNI config list file", "file", confFile, "error", err)
 				continue
 			}
 		} else {
 			conf, err := libcni.ConfFromFile(confFile)
 			if err != nil {
-				logger.Warn("Error loading CNI config file %s: %v", confFile, err)
+				logger.Warn("Error loading CNI config file", "file", confFile, "error", err)
 				continue
 			}
 			// Ensure the config has a "type" so we know what plugin to run.
 			// Also catches the case where somebody put a conflist into a conf file.
 			if conf.Network.Type == "" {
-				logger.Warn("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
+				logger.Warn("Error loading CNI config file: no 'type'; perhaps this is a .conflist?", "file", confFile)
 				continue
 			}
 
 			confList, err = libcni.ConfListFromConf(conf)
 			if err != nil {
-				logger.Warn("Error converting CNI config file %s to list: %v", confFile, err)
+				logger.Warn("Error converting CNI config file to list", "error", err)
 				continue
 			}
 		}
 		if len(confList.Plugins) == 0 {
-			logger.Warn("CNI config list %s has no networks, skipping", confFile)
+			logger.Warn("CNI config list has no networks, skipping", "file", confFile)
 			continue
 		}
 
 		cFile := filepath.Base(confFile)
-		logger.Info("Using CNI configuration file %s", cFile)
+		logger.Info("Using CNI configuration file", "file", cFile)
 		return cFile, nil
 	}
 	return "", fmt.Errorf("no valid networks found in %s", confDir)
 }
 
 func getDestFile(srcFile string, logger hclog.Logger) (string, error) {
-	logger.Info("CNI configuration destrination file %s", srcFile)
-	return srcFile, nil
+	destFile := srcFile
+	logger.Info("CNI configuration destrination file", "name", destFile)
+	return destFile, nil
 }
 
 func copyCNIBinary(srcDir, destDir string, logger hclog.Logger) error {
