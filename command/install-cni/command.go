@@ -85,7 +85,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagCNIBinSourceDir, "bin-source-dir", defaultCNIBinSourceDir, "Host location to copy the binary from")
 	c.flagSet.StringVar(&c.flagKubeconfig, "kubeconfig", defaultKubeconfig, "Name of the kubernetes config file")
 	c.flagSet.BoolVar(&c.flagMultus, "multus", false, "If the plugin is a multus plugin (default = false)")
-	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info", "Log verbosity level. Supported values (in order of detail) are \"trace\", "+
+	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "debug", "Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 		"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false, "Enable or disable JSON output format for logging.")
 
@@ -145,6 +145,11 @@ func (c *Command) Run(args []string) int {
 	srcFile := filepath.Join(install.MountedCNINetDir, srcFileName)
 	destFile := filepath.Join(install.MountedCNINetDir, destFileName)
 	// Append the consul configuration to the config that is there
+
+	// TODO: Handle pod restarts and continuous appending of config
+	// TODO: consul-cni binary needs chmod +x
+	// TODO: Handle binary already exists, replace?
+	// TODO: Add debug/info logging to functions
 	err = appendCNIConfig(cfg, srcFile, destFile, c.logger)
 	if err != nil {
 		c.logger.Error("Unable add the consul-cni config to the config file", "error", err)
