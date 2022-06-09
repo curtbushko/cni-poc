@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type kubeConfigFields struct {
+type KubeConfigFields struct {
 	KubernetesServiceProtocol string
 	KubernetesServiceHost     string
 	KubernetesServicePort     string
@@ -21,7 +21,7 @@ type kubeConfigFields struct {
 	ServiceAccountToken       string
 }
 
-func createKubeConfig(cfg *CNIConfig, logger hclog.Logger) error {
+func createKubeConfig(mountedPath, kubeconfigFile string, logger hclog.Logger) error {
 
 	var kubecfg *rest.Config
 	// Use the in-cluster kubeconfig to connect to the kubeapi
@@ -35,7 +35,8 @@ func createKubeConfig(cfg *CNIConfig, logger hclog.Logger) error {
 		return err
 	}
 
-	err = writeKubeConfig(kubeFields)
+	destFile := mountedPath + kubeconfigFile
+	err = writeKubeConfig(kubeFields, destFile)
 	if err != nil {
 		return err
 	}
@@ -43,7 +44,7 @@ func createKubeConfig(cfg *CNIConfig, logger hclog.Logger) error {
 	return nil
 }
 
-func getKubernetesFields(caData []byte) (*kubeConfigFields, error) {
+func getKubernetesFields(caData []byte) (*KubeConfigFields, error) {
 
 	var protocol = "https"
 	if val, ok := os.LookupEnv("KUBERNETES_SERVICE_PROTOCOL"); ok {
@@ -67,7 +68,7 @@ func getKubernetesFields(caData []byte) (*kubeConfigFields, error) {
 		return nil, err
 	}
 
-	return &kubeConfigFields{
+	return &KubeConfigFields{
 		KubernetesServiceProtocol: protocol,
 		KubernetesServiceHost:     serviceHost,
 		KubernetesServicePort:     servicePort,
@@ -85,7 +86,7 @@ func getServiceAccountToken() (string, error) {
 
 }
 
-func writeKubeConfig(fields *kubeConfigFields) error {
+func writeKubeConfig(fields *KubeConfigFields, destFile string) error {
 
 	tmpl, err := template.New("kubeconfig").Parse(kubeconfigTmpl)
 	if err != nil {
@@ -97,7 +98,11 @@ func writeKubeConfig(fields *kubeConfigFields) error {
 		return fmt.Errorf("could not execute kube config template: %v", err)
 	}
 
-	// TODO: Write out file
+	err = os.WriteFile(destFile, templateBuffer.Bytes(), os.FileMode(0o644))
+	if err != nil {
+		return fmt.Errorf("error writing kube config file %s: %v", destFile, err)
+	}
+
 	return nil
 }
 
