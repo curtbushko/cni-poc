@@ -187,7 +187,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	logger.Debug("set cni status on annotation", "annotation", keyCNIStatus)
 
 	podExec := NewPodExec(*restConfig, client) // Here, you need to get your restconfig and clientset from either ~/.kube/config or built-in pod config.
-	_, out, _, err := podExec.PodCopyFile("/etc/nginx/conf.d", "/var/log/nginx.conf.d", podNamespace, "frontend")
+	_, out, _, err := podExec.PodCopyFile("/etc/nginx/conf.d", "/tmp", podNamespace, "frontend")
 	if err != nil {
 		return err
 	}
