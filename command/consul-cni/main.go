@@ -17,16 +17,33 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"os"
+	"path/filepath"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
+	"github.com/hashicorp/go-hclog"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
 )
+
+type CNIArgs struct {
+	types.CommonArgs
+	IP                         net.IP
+	K8S_POD_NAME               types.UnmarshallableString
+	K8S_POD_NAMESPACE          types.UnmarshallableString
+	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString
+}
 
 // PluginConf is whatever you expect your configuration json to be. This is whatever
 // is passed in on stdin. Your plugin may wish to expose its functionality via
@@ -58,9 +75,9 @@ type PluginConf struct {
 
 // parseConfig parses the supplied configuration (and prevResult) from stdin.
 func parseConfig(stdin []byte) (*PluginConf, error) {
-	conf := PluginConf{}
+	cfg := PluginConf{}
 
-	if err := json.Unmarshal(stdin, &conf); err != nil {
+	if err := json.Unmarshal(stdin, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse network configuration: %v", err)
 	}
 
@@ -68,7 +85,7 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 	// previous result object into conf.PrevResult. If you need to modify
 	// or inspect the PrevResult you will need to convert it to a concrete
 	// versioned Result struct.
-	if err := version.ParsePrevResult(&conf.NetConf); err != nil {
+	if err := version.ParsePrevResult(&cfg.NetConf); err != nil {
 		return nil, fmt.Errorf("could not parse prevResult: %v", err)
 	}
 	// End previous result parsing
@@ -79,30 +96,53 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 	//		return nil, fmt.Errorf("anotherAwesomeArg must be specified")
 	//	}
 
-	return &conf, nil
+	return &cfg, nil
 }
 
 // cmdAdd is called for ADD requests
 func cmdAdd(args *skel.CmdArgs) error {
-	conf, err := parseConfig(args.StdinData)
+	cfg, err := parseConfig(args.StdinData)
 	if err != nil {
 		return err
 	}
 
-	// A plugin can be either an "originating" plugin or a "chained" plugin.
-	// Originating plugins perform initial sandbox setup and do not require
-	// any result from a previous plugin in the chain. A chained plugin
-	// modifies sandbox configuration that was previously set up by an
-	// originating plugin and may optionally require a PrevResult from
-	// earlier plugins in the chain.
+	// Get the values of args passed through CNI_ARGS
+	cniArgs := CNIArgs{}
+	if err := types.LoadArgs(args.Args, &cniArgs); err != nil {
+		return err
+	}
 
-	// START chained plugin code
-	if conf.PrevResult == nil {
+	podNamespace := string(cniArgs.K8S_POD_NAMESPACE)
+	podName := string(cniArgs.K8S_POD_NAME)
+
+	// We only run in a pod
+	if podNamespace == "" && podName == "" {
+		return fmt.Errorf("not running in a pod, namespace and pod should have values")
+	}
+
+	// Open a logfile to write to
+	logfile, err := os.OpenFile("/var/log/consul/cni/cni.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
+	if err != nil {
+		return nil
+	}
+	defer logfile.Close()
+
+	logPrefix := fmt.Sprintf("%s/%s", podNamespace, podName)
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:   logPrefix,
+		Level:  hclog.LevelFromString(cfg.LogLevel),
+		Output: logfile, // Write all logs to
+	})
+
+	// Check to see if the plugin is a chained plugin
+	if cfg.PrevResult == nil {
 		return fmt.Errorf("must be called as chained plugin")
 	}
 
-	// Convert the PrevResult to a concrete Result type that can be modified.
-	prevResult, err := current.GetResult(conf.PrevResult)
+	logger.Debug("cmdAdd: consul-cni plugin config", "config", cfg)
+	// Convert the PrevResult to a concrete Result type that can be modified. The CNI standard says
+	// that the previous result needs to be passed onto the next plugin
+	prevResult, err := current.GetResult(cfg.PrevResult)
 	if err != nil {
 		return fmt.Errorf("failed to convert prevResult: %v", err)
 	}
@@ -113,38 +153,30 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	// Pass the prevResult through this plugin to the next one
 	result := prevResult
+	logger.Debug("cmdAdd: consul-cni previous result", "result", result)
 
-	// END chained plugin code
+	ctx := context.Background()
+	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir+cfg.Kubeconfig))
+	if err != nil {
+		return fmt.Errorf("could not get rest config from kubernetes api: %s", err)
+	}
 
-	// START originating plugin code
-	// if conf.PrevResult != nil {
-	//	return fmt.Errorf("must be called as the first plugin")
-	// }
+	client, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return fmt.Errorf("Error initializing Kubernetes client: %s", err)
+	}
 
-	// Generate some fake container IPs and add to the result
-	// result := &current.Result{CNIVersion: current.ImplementedSpecVersion}
-	// result.Interfaces = []*current.Interface{
-	// 	{
-	// 		Name:    "intf0",
-	// 		Sandbox: args.Netns,
-	// 		Mac:     "00:11:22:33:44:55",
-	// 	},
-	// }
-	// result.IPs = []*current.IPConfig{
-	// 	{
-	// 		Address:   "1.2.3.4/24",
-	// 		Gateway:   "1.2.3.1",
-	// 		// Interface is an index into the Interfaces array
-	// 		// of the Interface element this IP applies to
-	// 		Interface: current.Int(0),
-	// 	}
-	// }
-	// END originating plugin code
+	pod, err := client.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 
-	// Implement your plugin here
+	for _, container := range pod.Spec.Containers {
+		logger.Info("container:", "name", container)
+	}
 
 	// Pass through the result for the next plugin
-	return types.PrintResult(result, conf.CNIVersion)
+	return types.PrintResult(result, cfg.CNIVersion)
 }
 
 // cmdDel is called for DELETE requests

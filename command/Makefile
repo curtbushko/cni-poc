@@ -1,16 +1,17 @@
-build:
+build: build-installer build-cni
+build-installer:
 	mkdir -p ./bin
 	GOOS=linux GOARCH=amd64 go build -o ./bin/consul-k8s
 
-cni:
+build-cni:
 	cd consul-cni && make build
 
 docker:
 	docker build -t curtbushko/cni-poc:0.2 .
 	docker push curtbushko/cni-poc:0.2
 
-.PHONY: cni 
-deploy:
+.PHONY: deploy-cni 
+deploy-cni:
 	kubectl create ns consul
 	kubectl apply -f ./deployment -n consul
 
@@ -20,7 +21,7 @@ create:
 delete:
 	kind delete cluster
 
-calico:
+deploy-calico:
 	kubectl create -f https://docs.projectcalico.org/manifests/tigera-operator.yaml
 	kubectl apply -f ./calico-config.yaml
 	@sleep 20
@@ -30,9 +31,15 @@ calico:
 hashicups:
 	kubectl apply -f ./hashicups -n consul
 
-zzz:
-	@echo "Zzzzzz"
-	@sleep 20
+wait-calico:
+	@echo "Waiting for Calico CNI installer to be finished"
+	kubectl wait --for=condition=ready --timeout=360s pod -l k8s-app=calico-node -n calico-system 
+	@echo "calico-node is ready!"
+
+wait-cni:
+	@echo "Waiting for CNI installer to be finished"
+	kubectl wait --for=condition=ready --timeout=360s pod -l k8s-app=consul-cni-node -n consul
+	@echo "consul-cni-node is ready!"
 
 podstatus:
 	kubectl ns consul 
@@ -41,5 +48,7 @@ podstatus:
 exec:
 	docker exec -it kind-control-plane /bin/bash
 
-all: delete create calico build cni docker zzz deploy zzz hashicups podstatus
+all: delete create deploy-calico build docker wait-calico deploy-cni wait-cni hashicups podstatus
+deploy: delete create deploy-calico wait-calico deploy-cni wait-cni hashicups podstatus
+
 	
