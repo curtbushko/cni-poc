@@ -29,6 +29,7 @@ import (
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/hashicorp/go-hclog"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -38,7 +39,9 @@ import (
 )
 
 const (
-	keyCNIStatus = "consul.hashicorp.com/cni-status"
+	keyCNIStatus    = "consul.hashicorp.com/cni-status"
+	keyInjectStatus = "consul.hashicorp.com/connect-inject-status"
+	injected        = "injected"
 )
 
 type CNIArgs struct {
@@ -175,23 +178,19 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
-	// Add an annotation to the pod
-	annotations := map[string]string{
-		keyCNIStatus: "true",
+	if hasBeenInjected(*pod) {
+		// If everything is good, add an annotation to the pod
+		annotations := map[string]string{
+			keyCNIStatus: "true",
+		}
+		pod.SetAnnotations(annotations)
+		_, err = client.CoreV1().Pods(podNamespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+	} else {
+		logger.Debug("skipping traffic redirect on un-injected pod")
 	}
-	pod.SetAnnotations(annotations)
-	_, err = client.CoreV1().Pods(podNamespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	logger.Debug("set cni status on annotation", "annotation", keyCNIStatus)
-
-	podExec := NewPodExec(*restConfig, client) // Here, you need to get your restconfig and clientset from either ~/.kube/config or built-in pod config.
-	_, out, _, err := podExec.PodCopyFile("/etc/nginx/conf.d", "/tmp", podNamespace, "frontend")
-	if err != nil {
-		return err
-	}
-	logger.Debug("out", "output", out.String())
 
 	// Pass through the result for the next plugin
 	return types.PrintResult(result, cfg.CNIVersion)
@@ -217,4 +216,11 @@ func main() {
 func cmdCheck(args *skel.CmdArgs) error {
 	// TODO: implement
 	return fmt.Errorf("not implemented")
+}
+
+func hasBeenInjected(pod corev1.Pod) bool {
+	if anno, ok := pod.Annotations[keyInjectStatus]; ok && anno == injected {
+		return true
+	}
+	return false
 }
