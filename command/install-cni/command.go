@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -157,12 +156,6 @@ func (c *Command) Run(args []string) int {
 	err = copyCNIBinary(install.CNIBinSourceDir, install.MountedCNIBinDir, c.logger)
 	if err != nil {
 		c.logger.Error("Unable to copy cni binary", "error", err)
-		return 1
-	}
-
-	logDir := "/var/log/consul/cni"
-	err = os.MkdirAll(path.Dir(logDir), 0755)
-	if err != nil {
 		return 1
 	}
 

@@ -7,8 +7,8 @@ metadata:
     release: cni-poc
 rules:
 - apiGroups: [""]
-  resources:
-  - pods
-  - nodes
-  verbs:
-  - get
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch", "patch", "update"]

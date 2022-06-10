@@ -29,7 +29,7 @@ deploy-calico:
 
 .PHONY: hashicups
 hashicups:
-	kubectl apply -f ./hashicups -n consul
+	kubectl apply -f ./hashicups/frontend.yaml -n consul
 
 wait-calico:
 	@echo "Waiting for Calico CNI installer to be finished"

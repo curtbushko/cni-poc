@@ -37,6 +37,10 @@ import (
 	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
 )
 
+const (
+	keyCNIStatus = "consul.hashicorp.com/cni-status"
+)
+
 type CNIArgs struct {
 	types.CommonArgs
 	IP                         net.IP
@@ -121,7 +125,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Open a logfile to write to
-	logfile, err := os.OpenFile("/var/log/consul/cni/cni.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
+	logfile, err := os.OpenFile("/var/log/consul-cni.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
 	if err != nil {
 		return nil
 	}
@@ -139,7 +143,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("must be called as chained plugin")
 	}
 
-	logger.Debug("cmdAdd: consul-cni plugin config", "config", cfg)
+	logger.Debug("consul-cni plugin config", "config", cfg)
 	// Convert the PrevResult to a concrete Result type that can be modified. The CNI standard says
 	// that the previous result needs to be passed onto the next plugin
 	prevResult, err := current.GetResult(cfg.PrevResult)
@@ -153,10 +157,10 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	// Pass the prevResult through this plugin to the next one
 	result := prevResult
-	logger.Debug("cmdAdd: consul-cni previous result", "result", result)
+	logger.Debug("consul-cni previous result", "result", result)
 
 	ctx := context.Background()
-	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir+cfg.Kubeconfig))
+	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
 	if err != nil {
 		return fmt.Errorf("could not get rest config from kubernetes api: %s", err)
 	}
@@ -171,9 +175,23 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
-	for _, container := range pod.Spec.Containers {
-		logger.Info("container:", "name", container)
+	// Add an annotation to the pod
+	annotations := map[string]string{
+		keyCNIStatus: "true",
 	}
+	pod.SetAnnotations(annotations)
+	_, err = client.CoreV1().Pods(podNamespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	logger.Debug("set cni status on annotation", "annotation", keyCNIStatus)
+
+	podExec := NewPodExec(*restConfig, client) // Here, you need to get your restconfig and clientset from either ~/.kube/config or built-in pod config.
+	_, out, _, err := podExec.PodCopyFile("/etc/nginx/conf.d", "/var/log/nginx.conf.d", podNamespace, "frontend")
+	if err != nil {
+		return err
+	}
+	logger.Debug("out", "output", out.String())
 
 	// Pass through the result for the next plugin
 	return types.PrintResult(result, cfg.CNIVersion)
