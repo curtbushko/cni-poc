@@ -17,8 +17,9 @@
 /cni/bin
 /cni/pkg
 /cni/cni
-/command/bin/consul-cni
+/command/consul-cni/bin
 /command/bin/consul-k8s
+/command/bin/consul-cni
 /demo/consul-cni
 PROJECT
 api
