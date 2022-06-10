@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
 
 func TestWriteKubeConfig(t *testing.T) {
+	logger := hclog.New(nil)
 	cases := []struct {
 		name       string
 		fields     *KubeConfigFields
@@ -37,7 +39,7 @@ func TestWriteKubeConfig(t *testing.T) {
 			tempDir := t.TempDir()
 			tempDestFile := filepath.Join(tempDir, c.destFile)
 
-			err := writeKubeConfig(c.fields, tempDestFile)
+			err := writeKubeConfig(c.fields, tempDestFile, logger)
 			if err != nil {
 				t.Fatal(err)
 			}

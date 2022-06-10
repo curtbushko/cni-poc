@@ -5,10 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
+
+	"github.com/curtbushko/cni-poc/command/config"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -31,24 +35,6 @@ const (
 )
 
 // TODO: Add description that explains the difference between CNIConfig and installConfig
-
-// CNIConfig are the values that are generated for the CNI plugin to use.
-type CNIConfig struct {
-	// Name of the plugin
-	Name string `json:"name" mapstructure:"name"`
-	// Type of plugin (consul-cni)
-	Type string `json:"type" mapstructure:"type"`
-	// CNIBinDir is the location of the cni config files on the node. Can bet as a cli flag.
-	CNIBinDir string `json:"cni_bin_dir" mapstructure:"cni_bin_dir"`
-	// CNINetDir is the locaion of the cni plugin on the node. Can be set as a cli flag.
-	CNINetDir string `json:"cni_net_dir" mapstructure:"cni_net_dir"`
-	// Multus is if the plugin is a multus plugin. Can be set as a cli flag.
-	Multus bool `json:"multus" mapstructure:"multus"`
-	// Kubeconfig file name. Can be set as a cli flag.
-	Kubeconfig string `json:"kubeconfig" mapstructure:"kubeconfig"`
-	// LogLevl is the logging level. Can be set as a cli flag.
-	LogLevel string `json:"log_level" mapstructure:"log_level"`
-}
 
 // installConfig are the values by the installer when running inside a container
 type installConfig struct {
@@ -120,6 +106,14 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	c.logger.Info("Running CNI install with configuration",
+		"name", cfg.Name,
+		"type", cfg.Type,
+		"cni_bin_dir", cfg.CNIBinDir,
+		"cni_net_dir", cfg.CNINetDir,
+		"multus", cfg.Multus,
+		"kubeconfig", cfg.Kubeconfig,
+		"log_level", cfg.LogLevel)
 	// Create the install Config for working with files
 	install, err := c.newInstallConfig()
 	if err != nil {
@@ -164,12 +158,17 @@ func (c *Command) Run(args []string) int {
 		c.logger.Error("Unable to copy cni binary", "error", err)
 		return 1
 	}
+
+	// run forever
+	exitSignal := make(chan os.Signal)
+	signal.Notify(exitSignal, syscall.SIGINT, syscall.SIGTERM)
+	<-exitSignal
 	return 0
 
 }
 
-func (c *Command) newCNIConfig() (*CNIConfig, error) {
-	return &CNIConfig{
+func (c *Command) newCNIConfig() (*config.CNIConfig, error) {
+	return &config.CNIConfig{
 		Name:       defaultName,
 		Type:       defaultType,
 		CNIBinDir:  c.flagCNIBinDir,
@@ -182,20 +181,20 @@ func (c *Command) newCNIConfig() (*CNIConfig, error) {
 
 func (c *Command) newInstallConfig() (*installConfig, error) {
 	return &installConfig{
-		MountedCNIBinDir: "/host/" + c.flagCNIBinDir,
-		MountedCNINetDir: "/host/" + c.flagCNINetDir,
+		MountedCNIBinDir: "/host" + c.flagCNIBinDir,
+		MountedCNINetDir: "/host" + c.flagCNINetDir,
 		CNIBinSourceDir:  c.flagCNIBinSourceDir,
 	}, nil
 }
 
-func appendCNIConfig(cfg *CNIConfig, srcFile, destFile string, logger hclog.Logger) error {
+func appendCNIConfig(cfg *config.CNIConfig, srcFile, destFile string, logger hclog.Logger) error {
 
 	// Needed to convert the config struct for inserting
 	// Check if file exists
 	if _, err := os.Stat(srcFile); os.IsNotExist(err) {
 		return fmt.Errorf("source cni config file %s does not exist: %v", srcFile, err)
 	}
-
+	logger.Debug("appendCNIConfig: using files", "srcFile", srcFile, "destFile", destFile)
 	// This section overwrites an existing plugins list entry for istio-cni
 	existingCNIConfig, err := os.ReadFile(srcFile)
 	if err != nil {
@@ -225,12 +224,14 @@ func appendCNIConfig(cfg *CNIConfig, srcFile, destFile string, logger hclog.Logg
 
 	// Check to see if 'type: consul-cni' already exists and remove it before appending.
 	// This can happen in a CrashLoop and we end up with many entries in the config file
+	logger.Debug("appendCNIConfig: plugins are", "plugins", plugins)
 	for i, p := range plugins {
 		plugin, ok := p.(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("error reading plugin from plugin list")
 		}
 		if plugin["type"] == "consul-cni" {
+			logger.Debug("appendCNIConfig: found existing consul-cni config, removing it")
 			plugins = append(plugins[:i], plugins[i+1:]...)
 			break
 		}
@@ -252,6 +253,7 @@ func appendCNIConfig(cfg *CNIConfig, srcFile, destFile string, logger hclog.Logg
 		return fmt.Errorf("error writing config file %s: %v", destFile, err)
 	}
 
+	logger.Info("Appended CNI config to default config file", "name", destFile)
 	return nil
 }
 
@@ -308,7 +310,7 @@ func getDefaultCNINetwork(confDir string, logger hclog.Logger) (string, error) {
 
 func getDestFile(srcFile string, logger hclog.Logger) (string, error) {
 	destFile := srcFile
-	logger.Info("CNI configuration destrination file", "name", destFile)
+	logger.Info("CNI configuration destination file", "name", destFile)
 	return destFile, nil
 }
 
@@ -317,6 +319,8 @@ func copyCNIBinary(srcDir, destDir string, logger hclog.Logger) error {
 
 	// If the src file does not exist then either the incorrect command line argument was used or
 	// the docker container we built is broken somehow.
+
+	logger.Info("Copying CNI binary", "name", filename, "source", srcDir, "dest", destDir)
 	srcFile := filepath.Join(srcDir, filename)
 	if _, err := os.Stat(srcFile); os.IsNotExist(err) {
 		return fmt.Errorf("source cni binary %s does not exist: %v", srcFile, err)
@@ -333,7 +337,7 @@ func copyCNIBinary(srcDir, destDir string, logger hclog.Logger) error {
 		return fmt.Errorf("could not read %s file: %v", srcFile, err)
 	}
 
-	err = os.WriteFile(filepath.Join(destDir, filename), srcBytes, os.FileMode(0o644))
+	err = os.WriteFile(filepath.Join(destDir, filename), srcBytes, os.FileMode(0o755))
 	if err != nil {
 		return fmt.Errorf("error copying consul-cni binary to %s: %v", destDir, err)
 	}

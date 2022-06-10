@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"text/template"
 
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/go-hclog"
 	"k8s.io/client-go/rest"
 )
@@ -24,27 +24,33 @@ type KubeConfigFields struct {
 func createKubeConfig(mountedPath, kubeconfigFile string, logger hclog.Logger) error {
 
 	var kubecfg *rest.Config
-	// Use the in-cluster kubeconfig to connect to the kubeapi
-	kubecfg, err := subcommand.K8SConfig("")
+
+	// Get kube config information from cluster
+	kubecfg, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+	err = rest.LoadTLSFiles(kubecfg)
 	if err != nil {
 		return err
 	}
 
-	kubeFields, err := getKubernetesFields(kubecfg.CAData)
+	kubeFields, err := getKubernetesFields(kubecfg.CAData, logger)
 	if err != nil {
 		return err
 	}
 
-	destFile := mountedPath + kubeconfigFile
-	err = writeKubeConfig(kubeFields, destFile)
+	destFile := filepath.Join(mountedPath, kubeconfigFile)
+	err = writeKubeConfig(kubeFields, destFile, logger)
 	if err != nil {
 		return err
 	}
 
+	logger.Info("Wrote kubeconfig file", "name", destFile)
 	return nil
 }
 
-func getKubernetesFields(caData []byte) (*KubeConfigFields, error) {
+func getKubernetesFields(caData []byte, logger hclog.Logger) (*KubeConfigFields, error) {
 
 	var protocol = "https"
 	if val, ok := os.LookupEnv("KUBERNETES_SERVICE_PROTOCOL"); ok {
@@ -67,7 +73,7 @@ func getKubernetesFields(caData []byte) (*KubeConfigFields, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	logger.Debug("getKubernetesFields: got fields", "protocol", protocol, "kubernetes host", serviceHost, "kubernetes port", servicePort)
 	return &KubeConfigFields{
 		KubernetesServiceProtocol: protocol,
 		KubernetesServiceHost:     serviceHost,
@@ -86,7 +92,7 @@ func getServiceAccountToken() (string, error) {
 
 }
 
-func writeKubeConfig(fields *KubeConfigFields, destFile string) error {
+func writeKubeConfig(fields *KubeConfigFields, destFile string, logger hclog.Logger) error {
 
 	tmpl, err := template.New("kubeconfig").Parse(kubeconfigTmpl)
 	if err != nil {
@@ -103,6 +109,7 @@ func writeKubeConfig(fields *KubeConfigFields, destFile string) error {
 		return fmt.Errorf("error writing kube config file %s: %v", destFile, err)
 	}
 
+	logger.Debug("writeKubeConfig:", "destFile", destFile)
 	return nil
 }
 
