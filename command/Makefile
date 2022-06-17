@@ -1,5 +1,9 @@
 CONSUL_K8S_DIR=$(HOME)/workspace/github.com/hashicorp/feature-cni
+MULTUS_DIR=$(HOME)/workspace/github.com/k8snetworkplumbingwg/multus-cni
 K8S_GIT_REV=$(shell cd ${CONSUL_K8S_DIR}; git rev-parse --short HEAD)
+GIT_COMMIT?=$(shell git rev-parse --short HEAD)
+GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
+GIT_DESCRIBE?=$(shell git describe --tags --always)
 
 gitrev:
 	echo "git rev: ${K8S_GIT_REV}"
@@ -50,21 +54,29 @@ hashicups:
 	kubectl apply -f ./hashicups/frontend.yaml -n consul
 
 
-control-plane: build-control-plane push-control-plane deploy-control-plane
+control-plane: build-control-plane deploy-control-plane
 
 build-control-plane:
-	cd $(CONSUL_K8S_DIR) && make control-plane-dev-docker
+	@echo "Building and pushing docker images for control-plane ARM64"
+	@cd $(CONSUL_K8S_DIR) && $(CONSUL_K8S_DIR)/control-plane/build-support/scripts/build-local.sh -o linux -a "arm64 amd64"
+	cd $(CONSUL_K8S_DIR) && docker buildx build --platform linux/arm64,linux/amd64 -t 'curtbushko/consul-k8s-control-plane-dev:latest' \
+        --push \
+        --target=dev \
+        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
+        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
+        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+        -f $(CONSUL_K8S_DIR)/control-plane/Dockerfile $(CONSUL_K8S_DIR)/control-plane
 
-push-control-plane:
-	cd $(CONSUL_K8S_DIR) && docker tag consul-k8s-control-plane-dev:latest consul-k8s-control-plane-dev:$(K8S_GIT_REV)
-	cd $(CONSUL_K8S_DIR) && docker tag consul-k8s-control-plane-dev:$(K8S_GIT_REV) curtbushko/consul-k8s-control-plane-dev:$(K8S_GIT_REV)
-	cd $(CONSUL_K8S_DIR) && docker tag consul-k8s-control-plane-dev:$(K8S_GIT_REV) curtbushko/consul-k8s-control-plane-dev:latest
-	docker push curtbushko/consul-k8s-control-plane-dev:$(K8S_GIT_REV)
+manifest:
+	docker manifest create --amend curtbushko/consul-k8s-control-plane-dev:latest \
+		curtbushko/consul-k8s-control-plane-dev:latest-arm64 \
+		curtbushko/consul-k8s-control-plane-dev:latest-amd64
+	docker manifest push curtbushko/consul-k8s-control-plane-dev:latest
 
 deploy-control-plane:
 	cd $(CONSUL_K8S_DIR)/charts && helm install consul ./consul \
           --set name=consul \
-          --set global.imageK8S="curtbushko/consul-k8s-control-plane-dev:$(K8S_GIT_REV)" \
+          --set global.imageK8S="curtbushko/consul-k8s-control-plane-dev:latest" \
 	  --set global.loglevel="debug" \
           --set connectInject.enabled=true \
           --set connectInject.default=true \
@@ -82,6 +94,9 @@ wait-control-plane:
 zzz:
 	@echo "Sleeping..."
 	sleep 30
+
+deploy-multus:
+	kubectl apply -f $(MULTUS_DIR)/deployments/multus-daemonset-thick-plugin.yml
 
 podstatus:
 	kubectl ns consul 
