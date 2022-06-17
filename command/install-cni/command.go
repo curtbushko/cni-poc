@@ -139,13 +139,24 @@ func (c *Command) Run(args []string) int {
 	srcFile := filepath.Join(install.MountedCNINetDir, srcFileName)
 	destFile := filepath.Join(install.MountedCNINetDir, destFileName)
 
-	// Append the consul configuration to the config that is there
-	err = appendCNIConfig(cfg, srcFile, destFile, c.logger)
-	if err != nil {
-		c.logger.Error("Unable add the consul-cni config to the config file", "error", err)
-		return 1
-	}
+	if cfg.Multus {
+		// Generate a CNI config file named consul-cni that Multus will grab and add to
+		// its own config. A `NetworkAttachmentDefinition` CRD is created as part of the helm
+		// install that tell Multis to grab our config file
+		err = multusCNIConfig(cfg, install.MountedCNINetDir, c.logger)
+		if err != nil {
+			c.logger.Error("Unable to generate consul-cni config for multus", "error", err)
+			return 1
+		}
 
+	} else {
+		// Append the consul configuration to the config that is there
+		err = appendCNIConfig(cfg, srcFile, destFile, c.logger)
+		if err != nil {
+			c.logger.Error("Unable add the consul-cni config to the config file", "error", err)
+			return 1
+		}
+	}
 	// Generate the kubeconfig file
 	err = createKubeConfig(install.MountedCNINetDir, cfg.Kubeconfig, c.logger)
 	if err != nil {
@@ -187,6 +198,23 @@ func (c *Command) newInstallConfig() (*installConfig, error) {
 	}, nil
 }
 
+func multusCNIConfig(cfg *config.CNIConfig, destDir string, logger hclog.Logger) error {
+	// TODO: Validate multus config, especially the directories
+	destFile := filepath.Join(destDir, "consul-cni.conf")
+
+	// TODO: Check if dir exits and throw an error if Not
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("could not marshal CNI config: %v", err)
+	}
+
+	err = os.WriteFile(destFile, b, os.FileMode(0o644))
+	if err != nil {
+		return fmt.Errorf("error writing config file %s: %v", destFile, err)
+	}
+
+	return nil
+}
 func appendCNIConfig(cfg *config.CNIConfig, srcFile, destFile string, logger hclog.Logger) error {
 
 	// Needed to convert the config struct for inserting
