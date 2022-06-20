@@ -96,7 +96,7 @@ zzz:
 	sleep 30
 
 deploy-multus:
-	kubectl apply -f $(MULTUS_DIR)/deployments/multus-daemonset-thick-plugin.yml
+	kubectl apply -f $(MULTUS_DIR)/deployments/multus-daemonset.yml
 
 podstatus:
 	kubectl ns consul 
