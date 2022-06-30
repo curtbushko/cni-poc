@@ -1,4 +1,4 @@
-CONSUL_K8S_DIR=$(HOME)/workspace/github.com/hashicorp/feature-cni
+CONSUL_K8S_DIR=$(HOME)/workspace/github.com/hashicorp/cni
 MULTUS_DIR=$(HOME)/workspace/github.com/k8snetworkplumbingwg/multus-cni
 K8S_GIT_REV=$(shell cd ${CONSUL_K8S_DIR}; git rev-parse --short HEAD)
 GIT_COMMIT?=$(shell git rev-parse --short HEAD)
@@ -14,7 +14,7 @@ build-installer:
 	GOOS=linux GOARCH=amd64 go build -o ./bin/consul-k8s
 
 build-cni:
-	cd consul-cni && make build
+	cd cni && make build
 
 push-cni:
 	docker build -t curtbushko/cni-poc:0.2 .
